@@ -26,9 +26,7 @@ class OverdueReminderStart(models.TransientModel):
         domain=[("customer_rank", ">", 0), ("parent_id", "=", False)],
     )
     user_ids = fields.Many2many("res.users", string="Salesman")
-    payment_ids = fields.Many2many(
-        "overdue.reminder.start.payment", "wizard_id", readonly=True
-    )
+    payment_ids = fields.Many2many("overdue.reminder.start.payment", readonly=True)
     start_days = fields.Integer(
         string="Trigger Delay",
         help="Odoo will propose to send an overdue reminder to a customer "
@@ -228,9 +226,7 @@ class OverdueReminderStart(models.TransientModel):
         unrec_domain = [
             ("account_id", "=", commercial_partner.property_account_receivable_id.id),
             ("partner_id", "=", commercial_partner.id),
-            ("full_reconcile_id", "=", False),
-            ("matched_debit_ids", "=", False),
-            ("matched_credit_ids", "=", False),
+            ("matching_number", "=", False),
         ]
         unrec_payments = amlo.search(
             unrec_domain
@@ -623,6 +619,28 @@ class OverdueReminderStep(models.TransientModel):
             if self.reminder_type != "phone":
                 rvals["counter"] = inv.overdue_reminder_counter + 1
             vals["reminder_ids"].append((0, 0, rvals))
+            if self.reminder_type == "mail":
+                inv.message_post(
+                    body=_(
+                        "<strong>Overdue reminder</strong> sent by mail: "
+                        "<a href=# data-oe-model=mail.mail "
+                        "data-oe-id=%(mail_id)s>%(mail_subject)s</a>.",
+                        mail_id=vals["mail_id"],
+                        mail_subject=self.mail_subject,
+                    )
+                )
+            elif self.reminder_type == "phone":
+                inv.message_post(
+                    body=_(
+                        "<strong>Overdue reminder</strong> by phone. "
+                        "Result/Info: %(result)s.",
+                        result=self.result_id.name,
+                    )
+                )
+            elif self.reminder_type == "post":
+                inv.message_post(
+                    body=_("<strong>Overdue reminder</strong> sent by post.")
+                )
 
     def print_letter(self):
         self.check_warnings()
